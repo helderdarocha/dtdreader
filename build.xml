@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+
+<project name="DTDReader" default="build">
+
+    <property name="build.dir" value="build" />
+    <property name="src.dir" value="src" />
+    <property name="test.report.dir" value="report" />
+    
+    <path id="junit.path">
+        <pathelement location="/dev/junit/junit.jar" />
+    </path>
+
+    <target name="build" depends="compile">
+        <copy todir="${build.dir}">
+            <fileset dir="${src.dir}" includes="testDTD.dtd" />
+        </copy>
+    </target>
+    
+    <target name="compile" depends="init">
+        <javac srcdir="${src.dir}" destdir="${build.dir}">
+            <classpath refid="junit.path" />
+        </javac>
+    </target>
+    
+    <target name="test-report" depends="clean, build" description="Runs all tests and generates report">
+        <junit printsummary="true" dir="${build.dir}" fork="true">
+            <formatter type="xml" usefile="true" />
+            <classpath path="${build.dir}" />
+            <batchtest todir="${test.report.dir}">
+                <fileset dir="${src.dir}">
+                    <include name="**/*Test*.java" />
+                    <exclude name="**/AllTests.java" />
+                </fileset>
+            </batchtest>
+        </junit>
+        <junitreport todir="${test.report.dir}">
+            <fileset dir="${test.report.dir}">
+                <include name="TEST-*.xml" />
+            </fileset>
+            <report format="frames" todir="${test.report.dir}/html" />
+        </junitreport>
+    </target>
+
+    <target name="test" depends="clean, build" description="Fast test run of entire build">
+        <junit printsummary="true" dir="${build.dir}" fork="true">
+            <formatter type="plain" usefile="false" />
+            <classpath path="${build.dir}" />
+            <test name="argonavis.dtd.AllTests" />
+         </junit>
+    </target>
+    
+    <target name="DTDReader-test" depends="build" description="Fast test run of entire build">
+        <junit printsummary="true" dir="${build.dir}" fork="true">
+            <formatter type="plain" usefile="false" />
+            <classpath path="${build.dir}" />
+            <test name="argonavis.dtd.DTDReaderTest" />
+         </junit>
+    </target>
+    
+    <target depends="build" description="API docs generation" name="javadoc">
+        <mkdir dir="docs/api"/>
+        <copy todir="tmp">
+            <fileset dir="${src.dir}">
+                <include name="**/*.java" />
+                <exclude name="**/**Test**" />
+            </fileset>
+        </copy>
+        <javadoc destdir="docs/api" packagenames="argonavis.*" sourcepath="tmp" />
+        <delete dir="tmp" />
+    </target>
+    
+    <target name="init">
+        <mkdir dir="${build.dir}" />
+        <mkdir dir="${test.report.dir}" />
+    </target>
+    
+    <target name="clean">
+        <delete dir="${build.dir}" />
+        <delete dir="docs" />
+        <delete dir="${test.report.dir}" />
+    </target>
+
+</project>

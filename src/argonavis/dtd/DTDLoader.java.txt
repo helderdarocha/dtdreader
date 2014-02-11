@@ -1,0 +1,392 @@
+package argonavis.dtd;
+
+import java.io.*;
+import java.util.*;
+
+/**
+ * Loads a DTD and extracts all elements, attributes, children and parents.
+ */
+public class DTDLoader {
+    
+    private HashMap elementMap;
+    private HashMap parameterEntityMap;
+    private HashMap attributeMap;
+    private String fileName;
+    
+    public DTDLoader(String fileName) {
+        elementMap = new HashMap();
+        attributeMap = new HashMap();
+        parameterEntityMap = new HashMap();
+        this.fileName = fileName;
+    }
+    
+    /**
+     * This is the main method of this class
+     */
+    public void load() throws IOException {
+        try {
+            parseDTD(this.fileName);
+            bindElementsToChildNodes();
+        } catch (ParseException e) {
+            throw new IOException("Error parsing file "+ fileName + ": " + e);   
+        }    
+    }
+    
+    /**
+     * Returns all Elements
+     */
+    public Element[] getElements() {
+        Collection elementList = elementMap.values();
+        return (Element[])elementList.toArray(new Element[elementList.size()]);
+    }
+    
+    /**
+     * Returns all Element names
+     */
+    public String[] getElementNames() {
+        Set elementNames = elementMap.keySet();
+        return (String[])elementNames.toArray(new String[elementNames.size()]);
+    }
+    
+    /**
+     * Returns HashMap with all Elements
+     */
+    public HashMap getElementMap() {
+        return elementMap;
+    }
+    
+    /**
+     * Returns HashMap with all Attributes
+     */
+    HashMap getAttributeMap() {
+        return attributeMap;
+    }
+    
+    /**
+     * Returns HashMap with all Parameter entities
+     */
+    HashMap getParameterEntityMap() {
+        return parameterEntityMap;
+    }
+    
+    /**
+     * Loads DTD from a file.
+     */
+    String loadDTD(String fileName) throws IOException {
+        File file = new File(fileName);
+        if (!file.exists()) {
+            throw new FileNotFoundException("File " + file.getPath() + " does not exist!");
+        }
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+        StringBuffer buffer = new StringBuffer(8192);
+        String line;
+        while ( (line = reader.readLine()) != null ) {
+            buffer.append(line);
+            buffer.append("\n");
+        }
+        String dtdContents = buffer.toString().trim();
+        if (!(dtdContents.startsWith("<?xml") || dtdContents.startsWith("<!"))) {
+            throw new IOException("Not an XML or DTD file");
+        }
+        return dtdContents;
+    }
+    
+    /**
+     * Parses DTD and extracts meaningful information in
+     * ENTITY, ELEMENT and ATTLIST.
+     * This version only supports parameter entities
+     * with the following format <!ENTITY % name "value">
+     * (or using '' instead of "")
+     */
+    void parseDTD(String fileName) throws ParseException, IOException {
+        String dtd = loadDTD(fileName);
+        StringTokenizer dtdTokenizer = new StringTokenizer(dtd, "<>");
+        while (dtdTokenizer.hasMoreTokens()) {
+            String name = dtdTokenizer.nextToken();
+            if (name.startsWith("!ENTITY")) {
+                StringTokenizer tokens = new StringTokenizer(name);
+                tokens.nextToken(); // gets rid of "!ENTITY"
+                String percent = tokens.nextToken();
+                if (percent.equals("%")) {  // ignore non-parameter entities
+                    parseEntityList(tokens);  
+                } else {
+                    System.out.println("Ignoring <" + name + ">");   
+                }
+            } else if (name.startsWith("!ELEMENT")) {
+                StringTokenizer tokens = new StringTokenizer(name);
+                tokens.nextToken(); // gets rid of "!ELEMENT"
+                parseElementList(tokens);
+            } else if (name.startsWith("!ATTLIST")) {
+                StringTokenizer tokens = new StringTokenizer(name);
+                tokens.nextToken(); // gets rid of "!ATTLIST"
+                parseAttributeList(tokens);
+            } else { // Ignore other markup
+                if (!name.trim().equals("")) {
+                    System.out.println("Ignoring <" + name + ">");   
+                }
+            }
+         }
+        // set Element list
+    }
+    
+    /** 
+     * Adds Attributes from the attributeMap to
+     * all the Elements in the elementMap
+     */
+    void bindElementsToChildNodes() {
+        Iterator iterator = elementMap.values().iterator();
+        while(iterator.hasNext()) {
+            Element element = (Element)iterator.next();
+            addChildrenToElement(element);
+            bindAttributeListToElement(element);
+        }
+    }
+    
+    /**
+     * Binds attribute list to corresponding element
+     */
+    void bindAttributeListToElement(Element element) {
+        String elementName = element.getName();
+        Attribute[] attributes = (Attribute[])attributeMap.get(elementName);
+        if (attributes == null) {
+            attributes = new Attribute[0];
+        }
+        element.setAttributes(attributes);
+    }
+    
+    /**
+     * Binds child Element nodes to existing parent Element.
+     * This preliminary version only collects the elements (ignoring rules and connectors)
+     * Text nodes are treated as Elements in this version.
+     */
+    void addChildrenToElement(Element element) {
+        String childRules = element.getRuleForChildren();
+        if (childRules == null || childRules.equals("EMPTY")) {
+            element.setChildren(new Element[0]); // zero children
+            return;
+        }
+        StringTokenizer tokens = new StringTokenizer(childRules, "|,()*+? "); // ignoring rules
+        List childList = new ArrayList();
+        while(tokens.hasMoreTokens()) {
+            String childName = tokens.nextToken();
+            Element child = null;
+            if (childName.equals("#PCDATA")) {
+                child = new Element("#PCDATA"); // not added to map, only to local list
+                child.setRuleForChildren("EMPTY");
+            } else {
+                child = (Element)elementMap.get(childName);
+            }
+            childList.add(child);
+        }
+        Element[] children = (Element[])childList.toArray(new Element[childList.size()]);
+        element.setChildren(children);
+    }
+    
+    /**
+     * Extracts name and value.
+     */
+    void parseEntityList(StringTokenizer tokens) {
+        String name = tokens.nextToken();
+        String contents = tokens.nextToken("").trim(); // rest of string
+        addToParameterEntityList(name, contents);
+    }     
+    
+    /**
+     * Adds a new String to HashMap where the
+     * key corresponds to the parameter entity's name
+     * (without the % and ;)
+     * Non-parameter entities are ignored.
+     */
+    void addToParameterEntityList(String name, String contents) {
+        parameterEntityMap.put(name, contents);
+    }    
+    
+    /**
+     * Extracts element information and adds to list
+     */
+    void parseElementList(StringTokenizer tokens) {
+        String name = tokens.nextToken().trim();
+        Element element = new Element(name);
+        String contents = tokens.nextToken("").trim(); // rest of string
+        element.setRuleForChildren(contents); // may be EMPTY
+        addToElementList(name, element);
+    }    
+    
+    void bogus(String elementName, String childRule) {
+        Element dummy1 = new Element(elementName);
+        dummy1.setRuleForChildren(childRule); // sets Elements locally
+        addToElementList(elementName, dummy1);
+    }
+    
+    /**
+     * Adds a new Element object to HashMap where the
+     * key corresponds to the element's name
+     */
+    void addToElementList(String key, Element element) {
+        elementMap.put(key, element);
+    }
+    
+    /**
+     * Adds a list of Attribute objects to HashMap where the
+     * key corresponds to the element's name. If the key already exists
+     * the lists are merged and then added.
+     */
+    void parseAttributeList(StringTokenizer tokens) throws ParseException {
+        String elementName = tokens.nextToken(); // this is the element name
+        String attributeList = tokens.nextToken("").trim(); // rest of string
+        Attribute[] attributes = getAttributes(attributeList);
+        addToAttributeList(elementName, attributes);
+    }
+    
+    /**
+     * Adds a list of Attribute objects to HashMap where the
+     * key corresponds to the element's name. If the key already exists
+     * the lists are merged and then added.
+     */
+    void addToAttributeList(String elementName, Attribute[] attributes) {
+        // If key exists, attributes were already added to this element
+        if (attributeMap.containsKey(elementName)) {
+            Attribute[] oldList = (Attribute[])attributeMap.get(elementName);
+            Attribute[] newList = attributes;
+            attributes = (Attribute[])mergeArrays(oldList, newList);
+        } 
+        attributeMap.put(elementName, attributes);
+    }
+    
+    /**
+     * Receives two object arrays and returns their elements merged in a single array,
+     * with the elements from the first array placed before the elements from the
+     * second array.
+     */
+    Object mergeArrays(Object[] firstList, Object[] secondList) {
+        Class type = firstList.getClass().getComponentType();
+        Object newList = java.lang.reflect.Array.newInstance(type, firstList.length + secondList.length);
+        System.arraycopy(firstList, 0, newList, 0, firstList.length);
+        System.arraycopy(secondList, 0, newList, firstList.length, secondList.length);   
+        return newList;
+    }
+    
+    /**
+     * Returns an array of Attribute objects extracted from
+     * an &lt;!ATTLIST&gt; string which contains only attribute
+     * information (no element name)
+     */
+    Attribute[] getAttributes(String tag) throws ParseException {
+        StringTokenizer tokens = new StringTokenizer(tag);
+        List attributeList = new ArrayList();
+        while(tokens.hasMoreTokens()) {
+            Attribute attribute = getAttributeData(tokens);
+            attributeList.add(attribute);
+        } // next Attribute
+        return (Attribute[])attributeList.toArray(new Attribute[attributeList.size()]);
+    }
+    
+    /**
+     * Receives a parameter entity: %string;
+     * Looks it up in the entityMap
+     * Replaces it with the corresponding value
+     */
+    String getParameterEntityValue(String entity) throws ParseException {
+        if (!(entity.startsWith("%") && entity.endsWith(";"))) {
+            throw new ParseException("Malformed parameter entity: " + entity + "!");
+        }
+        String key = entity.substring(1, entity.length()-1); // ignores % and ;
+        String value = (String)parameterEntityMap.get(key);
+        
+        int begin = 0;
+        if ( value != null && (begin = value.indexOf("%")) != -1) { // parameter entity in value!
+            int end = value.indexOf(";", begin);
+            if (end == -1) {
+                throw new ParseException("Malformed parameter entity: " + entity + "!");
+            }
+            String subParameterEntity = value.substring(begin, end+1); // %entity;
+
+            value = value.substring(0, begin) + // "prefix"%entity
+                    getParameterEntityValue(subParameterEntity) + 
+                    value.substring(end+1, value.length()); // %entity;"suffix"
+        }
+        if (value == null) {
+            throw new ParseException("Parameter entity value not found for " + entity + "!");
+        }
+        return value;   
+    }
+
+    /**
+     * Returns one Attribute object created
+     * from tokens which contain data for only one attribute.
+     */
+    Attribute getAttributeData(StringTokenizer tokens) throws ParseException {
+        String name = tokens.nextToken();
+        String type = tokens.nextToken();
+        String[] values = {}; // attribute values for enumerations
+            if (type.startsWith("%")) { // It is a parameter Entity - replace it with parameter value!
+                type = getParameterEntityValue(type);
+            }
+            if (type.startsWith("(")) { // it's an enumeration!
+                if(!type.endsWith(")")) { // there are spaces within the enumeration
+                    type = normalizeEnum(type, tokens); // remove spaces
+                }
+                if (!type.endsWith(")")) {
+                    throw new ParseException("Malformed DTD: enumeration does not contain closing parentheses!");
+                }
+                values = getEnumValues(type);
+                type = "LIST";
+            } else if(type.equals("NOTATION")) {
+                throw new UnsupportedOperationException("NOTATION attribute types not supported in curent release.");
+            } 
+            // CDATA, NMTOKEN, NMTOKENS, ENTITY, ENTITIES, ID, IDREF, IDREFS are supported
+            
+            String ruleOrDefault = tokens.nextToken();
+            String rule = ""; // #IMPLIED, #REQUIRED, #FIXED
+            String defaultValue = ""; // Literal value (starts with " or ')
+            if (ruleOrDefault.startsWith("#")) {
+                rule = ruleOrDefault;
+            } else if (ruleOrDefault.startsWith("\'") || ruleOrDefault.startsWith("\"")) {
+                defaultValue = ruleOrDefault.substring(1, ruleOrDefault.length()-1); // remove "" or ''
+            } else {
+                throw new ParseException("Malformed DTD: ruleOrDefault: (" + ruleOrDefault + ")");
+            }
+            
+            if (rule.equals("#FIXED")) {
+                defaultValue = tokens.nextToken(); // read one more token if fixed
+                if (!(defaultValue.startsWith("\'") || defaultValue.startsWith("\""))) {
+                     throw new ParseException("Malformed DTD: #FIXED ruleOrDefault: (" + ruleOrDefault + ")");
+                }
+                defaultValue = defaultValue.substring(1, defaultValue.length()-1); // remove "" or ''
+            }
+            return new Attribute(name, type, values, rule, defaultValue);
+    }
+    
+    /**
+     * Receives an ATTLIST enumeration which contains spaces and
+     * returns the same enumeration without the spaces
+     */
+    String normalizeEnum(String start, StringTokenizer tokens) {
+        StringBuffer enum = new StringBuffer(255);
+        enum.append(start);
+        String enumPart = "";
+        while( !(  (enumPart = tokens.nextToken()).endsWith(")")  ) && tokens.hasMoreTokens() ) {
+            enum.append(enumPart);
+        }
+        enum.append(enumPart);
+        return enum.toString();   
+    }
+    
+    /**
+     * Receives a spaceless enumeration string and
+     * returns an array that contains the individual items.
+     */
+    String[] getEnumValues(String enum) {
+        List valuesList = new ArrayList();
+        StringTokenizer valueTokens = new StringTokenizer(enum, "(|)");
+        while (valueTokens.hasMoreTokens()) {
+            valuesList.add(valueTokens.nextToken());
+        }
+        return (String[])valuesList.toArray(new String[valuesList.size()]);    
+    }
+    
+    public static String load(String dtd) {
+        return "DTDLoader.load(String): not implemented."   ;
+    }
+
+}

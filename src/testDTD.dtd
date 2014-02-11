@@ -1,0 +1,39 @@
+<!ENTITY % boolean "(true | false)">
+<!ENTITY % status "(current | deprecated)">
+
+<!ELEMENT element ( element-name, description, replaces, parents, children, attributes, examples, see-also ) >
+<!ATTLIST element optional %boolean; "false"
+                  status %status; "current" 
+                  type (task | datatype) #REQUIRED >
+<!ATTLIST element version CDATA #REQUIRED >
+
+<!ELEMENT attribute ( description, value, condition, default, examples ) >
+<!ATTLIST attribute name CDATA #REQUIRED >
+<!ATTLIST attribute status %status; "current">
+<!ATTLIST attribute use (optional | required | conditional) #REQUIRED >
+
+<!ELEMENT attributes ( #PCDATA | attribute )* >
+<!ELEMENT children ( quantity ) >
+<!ELEMENT code ( #PCDATA ) >
+<!ELEMENT condition ( #PCDATA ) >
+
+<!ELEMENT default ( #PCDATA ) >
+<!ATTLIST default type CDATA #REQUIRED >
+
+<!ELEMENT description ( #PCDATA ) >
+
+<!ELEMENT element-name ( #PCDATA ) >
+<!ELEMENT example ( #PCDATA | code )* >
+<!ELEMENT examples ( #PCDATA | example )* >
+<!ELEMENT parents ( #PCDATA ) >
+
+<!ELEMENT quantity ( #PCDATA ) >
+<!ATTLIST quantity rule CDATA #REQUIRED >
+
+<!ELEMENT replaces ( #PCDATA) >
+
+<!ELEMENT see-also ( #PCDATA ) >
+
+<!ELEMENT value ( #PCDATA ) >
+<!ATTLIST value default %boolean; #REQUIRED >
+<!ATTLIST value type CDATA #REQUIRED >

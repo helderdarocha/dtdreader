@@ -1,0 +1,8 @@
+build
+report
+dist
+*~
+*.bak
+*.backup
+*.autosave
+#*

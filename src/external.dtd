@@ -1,0 +1,3 @@
+<!-- External DTD subset -->
+<!ELEMENT quantity ( #PCDATA ) >
+<!ATTLIST quantity rule CDATA #REQUIRED >

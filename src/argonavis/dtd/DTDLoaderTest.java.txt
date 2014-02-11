@@ -1,0 +1,793 @@
+
+/*
+ *  DTDLoaderTest.java
+ *  JUnit based test
+ *
+ *  Created on January 26, 2002, 2:19 AM
+ */
+package argonavis.dtd;
+
+import junit.framework.*;
+import java.io.*;
+import java.util.*;
+
+/**
+ *@author     helder
+ *@created    January 28, 2002
+ */
+public class DTDLoaderTest extends TestCase {
+
+    DTDLoader loader;
+
+    // element names for preliminary tests
+    String[] unparsedElements;
+    String[] elementNames;
+    String[] childRules;
+    Attribute[] atts;
+    // location for test DTD
+    String testDTDPath = "testDTD.dtd";
+
+    // Loaded test DTD as String
+    String testDTD =
+            "<!ENTITY % boolean \"(true | false)\">\n<!ENTITY % status \"(current | deprecated)\">\n\n<!ELEMENT element " +
+            "( element-name, description, replaces, parents, children, attributes, examples, see-also ) >\n<!ATTLIST " +
+            "element optional %boolean; \"false\"\n                  status %status; \"current\" \n                  " +
+            "type (task | datatype) #REQUIRED >\n<!ATTLIST element version CDATA #REQUIRED >\n\n<!ELEMENT attribute ( " +
+            "description, value, condition, default, examples ) >\n<!ATTLIST attribute name CDATA #REQUIRED >\n<!ATTLIST " +
+            "attribute status %status; \"current\">\n<!ATTLIST attribute use (optional | required | conditional) #REQUIRED " +
+            ">\n\n<!ELEMENT attributes ( #PCDATA | attribute )* >\n<!ELEMENT children ( quantity ) >\n<!ELEMENT code " +
+            "( #PCDATA ) >\n<!ELEMENT condition ( #PCDATA ) >\n\n<!ELEMENT default ( #PCDATA ) >\n<!ATTLIST default type " +
+            "CDATA #REQUIRED >\n\n<!ELEMENT description ( #PCDATA ) >\n\n<!ELEMENT element-name ( #PCDATA ) >\n<!ELEMENT " +
+            "example ( #PCDATA | code )* >\n<!ELEMENT examples ( #PCDATA | example )* >\n<!ELEMENT parents ( #PCDATA ) >" +
+            "\n\n<!ELEMENT quantity ( #PCDATA ) >\n<!ATTLIST quantity rule CDATA #REQUIRED >\n\n<!ELEMENT replaces ( #PCDATA" +
+            ") >\n\n<!ELEMENT see-also ( #PCDATA ) >\n\n<!ELEMENT value ( #PCDATA ) >\n<!ATTLIST value default %boolean; " +
+            "#REQUIRED >\n<!ATTLIST value type CDATA #REQUIRED >";
+
+    // Expected entity information
+    String[] dtdEntities = {"boolean", "status"};
+    String[] dtdEntValues = {"(true | false)", "(current | deprecated)"};
+    // Expected Element information
+    String[] dtdElementRules = {"( element-name, description, replaces, parents, children, attributes, examples, see-also )", "( description, value, condition, default, examples )", "( #PCDATA )", "( #PCDATA | attribute )*", "( quantity )", "( #PCDATA )", "( #PCDATA )", "( #PCDATA )", "( #PCDATA )", "( #PCDATA | code )*", "( #PCDATA | example )*", "( #PCDATA )", "( #PCDATA )", "( #PCDATA)", "( #PCDATA )", "( #PCDATA )"};
+    String[] dtdElementNames = {"element", "attribute", "description", "attributes", "children", "code", "condition", "default", "element-name", "example", "examples", "parents", "quantity", "replaces", "see-also", "value"};
+    // Expected Attributes from DTD
+    Attribute[] allDtdAttributes =
+            {new Attribute("optional", "LIST", new String[]{"true", "false"}, "", "false"),
+            new Attribute("status", "LIST", new String[]{"current", "deprecated"}, "", "current"),
+            new Attribute("type", "LIST", new String[]{"task", "datatype"}, "#REQUIRED", "false"),
+            new Attribute("version", "CDATA", new String[]{"true", "false"}, "#REQUIRED", "false"),
+            new Attribute("name", "CDATA", new String[0], "#REQUIRED", ""),
+            new Attribute("status", "LIST", new String[]{"current", "deprecated"}, "", "current"),
+            new Attribute("use", "LIST", new String[]{"optional", "required", "conditional"}, "#REQUIRED", ""),
+            new Attribute("default", "LIST", new String[]{"true", "false"}, "#REQUIRED", ""),
+            new Attribute("type", "CDATA", new String[0], "#REQUIRED", ""),
+            new Attribute("type", "CDATA", new String[0], "#REQUIRED", ""),
+            new Attribute("rule", "CDATA", new String[0], "#REQUIRED", "")};
+    // Expected Attributes to be bound to <element> element
+    Attribute[] elementDtdAttributes =
+            {new Attribute("optional", "LIST", new String[]{"true", "false"}, "", "false"),
+            new Attribute("status", "LIST", new String[]{"current", "deprecated"}, "", "current"),
+            new Attribute("type", "LIST", new String[]{"task", "datatype"}, "#REQUIRED", "false"),
+            new Attribute("version", "CDATA", new String[]{"true", "false"}, "#REQUIRED", "false")};
+    // Expected Attributes to be bound to <attribute> element
+    Attribute[] attributeDtdAttributes =
+            {new Attribute("name", "CDATA", new String[0], "#REQUIRED", ""),
+            new Attribute("status", "LIST", new String[]{"current", "deprecated"}, "", "current"),
+            new Attribute("use", "LIST", new String[]{"optional", "required", "conditional"}, "#REQUIRED", "")};
+    // Expected Attributes to be bound to <value> element
+    Attribute[] valueDtdAttributes =
+            {new Attribute("default", "LIST", new String[]{"true", "false"}, "#REQUIRED", ""),
+            new Attribute("type", "CDATA", new String[0], "#REQUIRED", "")};
+    // Expected Attributes to be bound to <default> element
+    Attribute[] defaultDtdAttributes = {new Attribute("type", "CDATA", new String[0], "#REQUIRED", "")};
+    // Expected Attributes to be bound to <quantity> element
+    Attribute[] quantityDtdAttributes = {new Attribute("rule", "CDATA", new String[0], "#REQUIRED", "")};
+
+
+    /////////////////////////////////////////////////
+    /**
+     *  Test for DTDLoader
+     *
+     *@param  testName  Description of Parameter
+     *@since
+     */
+    public DTDLoaderTest(java.lang.String testName) {
+        super(testName);
+    }
+
+
+    /**
+     *  The main program for the DTDLoaderTest class
+     *
+     *@param  args  The command line arguments
+     *@since
+     */
+    public static void main(java.lang.String[] args) {
+        junit.textui.TestRunner.run(suite());
+    }
+
+
+    /**
+     *  A unit test suite for JUnit
+     *
+     *@return    The test suite
+     *@since
+     */
+    public static Test suite() {
+        TestSuite suite = new TestSuite(DTDLoaderTest.class);
+
+        return suite;
+    }
+
+
+    /**
+     *  The JUnit setup method
+     *
+     *@since
+     */
+    public void setUp() {
+        loader = new DTDLoader(testDTDPath);
+
+        unparsedElements = new String[]{"t_project (t_target | t_property)*",
+                "t_target (t_javac+ , t_property* , (t_copy | t_classpath))",
+                "t_javac (t_classpath)*",
+                "t_property ( #PCDATA | t_classpath )*",
+                "t_copy EMPTY",
+                "t_classpath EMPTY"};
+        elementNames = new String[]{"t_project", "t_target", "t_javac", "t_property", "t_copy", "t_classpath"};
+        childRules = new String[]{"(t_target | t_property)*", "(t_javac+ , t_property* , (t_copy | t_classpath))", "(t_classpath)*", "( #PCDATA | t_classpath )*", "EMPTY", "EMPTY"};
+
+        // Six elements, 3 with children
+        for (int i = 0; i < elementNames.length; i++) {
+            Element e = new Element(elementNames[i]);
+            e.setRuleForChildren(childRules[i]);
+            loader.addToElementList(e.getName(), e);
+        }
+
+        // Three entity parameters
+        loader.addToParameterEntityList("boo", "(true | false)");
+        loader.addToParameterEntityList("tasklist", "a|b | c |%boo; | d|e ");
+        loader.addToParameterEntityList("threedeep", "start, %tasklist;, end");
+
+        // Same 4 attributes for half of the elements.
+        // More to be added later in test
+        atts = new Attribute[4];
+        atts[0] = new Attribute("t_id", "ID", new String[0], "#IMPLIED", "");
+        atts[1] = new Attribute("t_name", "CDATA", new String[0], "#IMPLIED", "");
+        atts[2] = new Attribute("t_optional", "LIST", new String[]{"true", "false"}, "#REQUIRED", "false");
+        atts[3] = new Attribute("t_value", "CDATA", new String[0], "#FIXED", "nothing");
+        for (int i = 0; i < elementNames.length / 2; i++) {
+            // will add to first three
+            loader.addToAttributeList(elementNames[i], atts);
+        }
+
+    }
+
+
+    /**
+     *  Test of getElements method, of class argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testGetElements() {
+        Element[] elements = loader.getElements();
+
+        // check if not null and same size
+        assertNotNull(elements);
+        assertEquals(elements.length, elementNames.length);
+
+        // check if names match
+        String[] receivedNames = new String[elements.length];
+        for (int i = 0; i < receivedNames.length; i++) {
+            receivedNames[i] = elements[i].getName();
+        }
+        this.assertEqualLists(receivedNames, elementNames);
+    }
+
+
+    /**
+     *  Test of getElementNames method, of class argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testGetElementNames() {
+        // check if names match
+        this.assertEqualLists(loader.getElementNames(), elementNames);
+    }
+
+
+    /**
+     *  Checks if two lists contain the same elements
+     *
+     *@param  listOne  Description of Parameter
+     *@param  listTwo  Description of Parameter
+     *@since
+     */
+    public void assertEqualLists(Object[] listOne, Object[] listTwo) {
+        Arrays.sort(listOne);
+        Arrays.sort(listTwo);
+        assertNotNull(listOne);
+        assertNotNull(listTwo);
+        assertEquals(listOne.length, listTwo.length);
+        for (int i = 0; i < listOne.length; i++) {
+            assertEquals(listOne[i], listOne[i]);
+        }
+    }
+
+
+    /**
+     *  Test of getElementMap method, of class argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testGetElementMap() {
+        HashMap map = loader.getElementMap();
+
+        // check not null
+        assertNotNull(map);
+
+        // check if keys are same as elementNames
+        Set keys = map.keySet();
+        String[] keysArray = (String[])keys.toArray(new String[keys.size()]);
+        assertEqualLists(keysArray, elementNames);
+
+    }
+
+
+    /**
+     *  Returns HashMap with all Attributes
+     *
+     *@since
+     */
+    public void testGetAttributeMap() {
+        HashMap map = loader.getAttributeMap();
+
+        // check not null
+        assertNotNull(map);
+
+        // check if keys are a subset of elementNames
+        Set keys = map.keySet();
+        String[] keysArray = (String[])keys.toArray(new String[keys.size()]);
+        //assertEqualLists(keysArray, elementNames);
+
+        // check if values are Attributes
+        Collection objects = map.values();
+
+        // check Attribute names for specific known Element
+        String elementName = "t_project";
+        String[] attributeNames = {"t_id", "t_name", "t_optional", "t_value"};
+        Attribute[] attributes = (Attribute[])map.get(elementName);
+        // check if names match
+        String[] receivedNames = new String[attributes.length];
+        for (int i = 0; i < receivedNames.length; i++) {
+            receivedNames[i] = attributes[i].getName();
+        }
+        this.assertEqualLists(receivedNames, attributeNames);
+
+        // check for attributes loaded from DTD
+    }
+
+
+    /**
+     *  Returns HashMap with all Parameter entities
+     *
+     *@since
+     */
+    public void testGetParameterEntityMap() {
+        HashMap map = loader.getParameterEntityMap();
+
+        // check not null
+        assertNotNull(map);
+
+        // check for known stored entities
+        String[] names = {"boo", "tasklist", "threedeep"};
+        String[] values = {"(true | false)", "a|b | c |%boo; | d|e ", "start, %tasklist;, end"};
+        for (int i = 0; i < names.length; i++) {
+            String received = (String)map.get(names[i]);
+            assertEquals(values[i], received);
+        }
+
+        // check for entities loaded from DTD
+    }
+
+
+    /**
+     *  Test of loadDTD method, of class argonavis.dtd.DTDLoader.
+     *
+     *@exception  IOException  Description of Exception
+     *@since
+     */
+    public void testLoadDTD() throws IOException {
+        String dtd = loader.loadDTD(testDTDPath);
+        assertEquals(dtd, testDTD);
+    }
+
+
+    /**
+     *  Test of parseDTD method, of class argonavis.dtd.DTDLoader.
+     *
+     *@exception  ParseException  Description of Exception
+     *@exception  IOException     Description of Exception
+     *@since
+     */
+    public void testParseDTD() throws ParseException, IOException {
+        loader.parseDTD(testDTDPath);
+        // Check if Elements HashMap has all the elements from the DTD
+        // Expected Elements: dtdElementNames
+        HashMap map = loader.getElementMap();
+        String[] mergedElementNamesList = (String[])loader.mergeArrays(dtdElementNames, elementNames);
+        String[] elementKeys = (String[])map.keySet().toArray(new String[map.keySet().size()]);
+        assertEqualLists(elementKeys, mergedElementNamesList);
+        // keys (Element names) successfully read from DTD
+
+        // using only DTD data
+        for (int i = 0; i < dtdElementNames.length; i++) {
+            Element testElement = new Element(dtdElementNames[i]);
+            testElement.setRuleForChildren(dtdElementRules[i]);
+            Element realElement = (Element)map.get(dtdElementNames[i]);
+            assertNotNull(realElement);
+            assertEntry(map, dtdElementNames[i], testElement);
+            // test children and attribute in bind method!
+        }
+
+        // Check if Attributes HashMap has all the attributes from the DTD
+        // Expected Attributes: allDtdAttributes
+        // It only makes sense to test attributes per element!!!
+        HashMap atmap = loader.getAttributeMap();
+        Iterator it = atmap.values().iterator();
+        while (it.hasNext()) {
+            Attribute[] n = (Attribute[])it.next();
+            for (int j = 0; j < n.length; j++) {
+                System.out.print(n[j].getName() + ", ");
+            }
+            System.out.println();
+        }
+        Attribute[] mergedAttributeList = (Attribute[])loader.mergeArrays(allDtdAttributes, atts);
+        assertEquals(atmap.values().size(), mergedAttributeList.length);
+        //Attribute[] extractedAtts = (Attribute[])atmap.values().toArray(new Attribute[atmap.values().size()]);
+        //assertEqualLists(extractedAtts, mergedAttributeList); // keys (Element names) successfully read from DTD
+
+        // using only DTD data
+        /*
+         *  for (int i = 0; i < allDtdAttributes.length; i++) {
+         *  Attribute testAttribute = new Element(dtdElementNames[i]);
+         *  testElement.setRuleForChildren(dtdElementRules[i]);
+         *  Element realElement = (Element)map.get(dtdElementNames[i]);
+         *  assertNotNull(realElement);
+         *  assertEntry(map, dtdElementNames[i], testElement);
+         *  }
+         */
+        // Check if the Entities HashMap has all the Parameter Entities from the DTD
+        fail("Partially complete. Not done yet!");
+
+    }
+
+
+    /**
+     *  Test of bindElementsToChildNodes method, of class argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testBindElementsToChildNodes() { 
+        fail("Not done yet!");
+    }
+
+
+    /**
+     *  Test of bindAttributeListToElement method, of class
+     *  argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testBindAttributeListToElement() {
+        HashMap map = loader.getElementMap();
+        String[] names = {"t_project", "t_property"};
+        // 4 attributes and no attributes
+        Element[] testElements = new Element[names.length];
+        Attribute[][] expected = {atts, new Attribute[0]};
+        for (int i = 0; i < testElements.length; i++) {
+            testElements[i] = (Element)map.get(names[i]);
+            loader.bindAttributeListToElement(testElements[i]);
+            assertEqualLists(expected[i], testElements[i].getAttributes());
+        }
+    }
+
+
+    /**
+     *  Test of addChildrenToElement method, of class argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testAddChildrenToElement() {
+        HashMap map = loader.getElementMap();
+
+        String[] names = {"t_target", "t_property", "t_copy"};
+        // 4 children, 2 children (one #PCDATA) and no children
+        Element[] testElements = new Element[names.length];
+        String[] elementsAsString = new String[names.length];
+        for (int i = 0; i < testElements.length; i++) {
+            testElements[i] = (Element)map.get(names[i]);
+            loader.addChildrenToElement(testElements[i]);
+            elementsAsString[i] = testElements[i].toString();
+        }
+        // Weak test - replace with a more reliable source as soon as possible
+        String[] expectedStrings = {"t_target\n    |t_javac|t_property|t_copy|t_classpath",
+                "t_property\n    |#PCDATA|t_classpath",
+                "t_copy"};
+        this.assertEqualLists(elementsAsString, expectedStrings);
+    }
+
+
+    /**
+     *  Extracts name and value.
+     *
+     *@since
+     */
+    public void testParseElementList() {
+        for (int i = 0; i < unparsedElements.length; i++) {
+            StringTokenizer tokens = new StringTokenizer(unparsedElements[i]);
+            loader.parseElementList(tokens);
+            // set Element from parseList
+
+            Element dummy = new Element(elementNames[i]);
+            dummy.setRuleForChildren(childRules[i]);
+            // sets Elements locally
+
+            HashMap map = loader.getElementMap();
+            assertEntry(map, elementNames[i], dummy);
+            Element stored = (Element)map.get(elementNames[i]);
+            assertNotNull(stored);
+            assertEquals(stored.getName(), elementNames[i]);
+            assertEquals(stored.getRuleForChildren(), childRules[i]);
+        }
+    }
+
+
+    /**
+     *  Adds a new String to HashMap where the key corresponds to the parameter
+     *  entity's name (without the % and ;) Non-parameter entities are ignored.
+     *
+     *@since
+     */
+    public void testAddToParameterEntityList() {
+        // Add new parameter entity
+        loader.addToParameterEntityList("foo", "bar");
+        // Assert entry was added
+        HashMap map = loader.getParameterEntityMap();
+        assertEntry(map, "foo", "bar");
+    }
+
+
+    /**
+     *  Asserts entry exists in HashMap and has the supplied value
+     *
+     *@param  map    Description of Parameter
+     *@param  key    Description of Parameter
+     *@param  value  Description of Parameter
+     *@since
+     */
+    public void assertEntry(HashMap map, Object key, Object value) {
+        Object receivedValue = map.get(key);
+        assertNotNull(receivedValue);
+        assertEquals(value, receivedValue);
+    }
+
+
+    /**
+     *  Adds a new Element object to HashMap where the key corresponds to the
+     *  element's name
+     *
+     *@since
+     */
+    public void testParseEntityList() {
+        String testString = "direction \"(north | south | east | west)\"";
+        StringTokenizer tokens = new StringTokenizer(testString);
+        loader.parseEntityList(tokens);
+        assertEntry(loader.getParameterEntityMap(), "direction", "\"(north | south | east | west)\"");
+    }
+
+
+    /**
+     *  Test of addToElementList method, of class argonavis.dtd.DTDLoader.
+     *
+     *@since
+     */
+    public void testAddToElementList() {
+        // Add new element
+        Element foo = new Element("foo");
+        foo.setRuleForChildren("( element-name, %boolean;, replaces, parents, children, attributes, examples, see-also )");
+        loader.addToElementList("foo", foo);
+        // Assert entry was added
+        HashMap map = loader.getElementMap();
+        assertEntry(map, "foo", new Element("foo"));
+    }
+
+
+    /**
+     *  Adds a list of Attribute objects to HashMap where the key corresponds to
+     *  the element's name. If the key already exists the lists are merged and
+     *  then added.
+     *
+     *@exception  ParseException  Description of Exception
+     *@since
+     */
+    public void testParseAttributeList() throws ParseException {
+        String unparsedAttributeList =
+                "t_copy id ID #REQUIRED refid IDREF #IMPLIED dir CDATA #FIXED \"hello\" defaultexcludes %boo; " +
+                "#IMPLIED casesensitive (one | two | three) \"one\"\n includes CDATA #IMPLIED ";
+        loader.parseAttributeList(new StringTokenizer(unparsedAttributeList));
+        HashMap map = loader.getAttributeMap();
+        Attribute[] list = (Attribute[])map.get("t_copy");
+        // Local test values
+        String elementName = "t_copy";
+        String attList = "id ID #REQUIRED refid IDREF #IMPLIED dir CDATA #FIXED \"hello\" defaultexcludes %boo; " +
+                "#IMPLIED casesensitive (one | two | three) \"one\"\n includes CDATA #IMPLIED ";
+        Attribute[] testList = loader.getAttributes(attList);
+        assertNotNull(testList);
+        assertEquals(testList.length, list.length);
+        Arrays.sort(list);
+        Arrays.sort(testList);
+        for (int i = 0; i < list.length; i++) {
+            this.assertEqualAttributes(list[i], testList[i]);
+        }
+    }
+
+
+    /**
+     *  Adds a list of Attribute objects to HashMap where the key corresponds to
+     *  the element's name. If the key already exists the lists are merged and
+     *  then added.
+     *
+     *@since
+     */
+    public void testAddToAttributeList() {
+        // some test elements
+        HashMap map = loader.getAttributeMap();
+
+        // (1)) Adding attributes to existing list
+        String elementName01 = "t_target";
+        // get existing attributes
+        Attribute[] attListOne = (Attribute[])map.get(elementName01);
+        // 4 attributes
+        assertEquals(attListOne.length, 4);
+        // 4 more attributes for t_target element
+        String[] atnames01 = {"xid", "xname", "xoptional"};
+        Attribute[] atts01 = this.createSampleAttributeList(atnames01);
+        loader.addToAttributeList(elementName01, atts01);
+        // check and see if attributes were added
+        Attribute[] _attListOne = (Attribute[])map.get(elementName01);
+        // 7 attributes
+        // check length
+        assertEquals(_attListOne.length, 7);
+
+        // (2) New Attribute list
+        String elementName02 = "t_classpath";
+        // get existing attributes
+        Attribute[] attListTwo = (Attribute[])map.get(elementName02);
+        // 0 attributes
+        assertNull(attListTwo);
+        // 3 new attributes for t_classpath element
+        String[] atnames02 = {"yid", "yname", "yoptional"};
+        Attribute[] atts02 = this.createSampleAttributeList(atnames02);
+        loader.addToAttributeList(elementName02, atts02);
+        // check and see if attributes were added
+        Attribute[] _attListTwo = (Attribute[])map.get(elementName02);
+        // 3 attributes
+        // check
+        assertEquals(_attListTwo.length, 3);
+        assertEntry(map, elementName02, _attListTwo);
+    }
+
+
+    /**
+     *  Create sample attributes for testing
+     *
+     *@param  names  Description of Parameter
+     *@return        Description of the Returned Value
+     *@since
+     */
+    public Attribute[] createSampleAttributeList(String[] names) {
+        // random fill-in
+        String[] types = {"ID", "CDATA", "LIST"};
+        String[][] values = {new String[0], new String[0], new String[]{"true", "false"}};
+        String[] uses = {"#IMPLIED", "#FIXED", "#REQUIRED"};
+        String[] defaults = {"", "nothing", "false"};
+
+        Attribute[] atts = new Attribute[names.length];
+        for (int i = 0; i < names.length; i++) {
+            int j = (int)(Math.random() * 3);
+            atts[i] = new Attribute(names[i], types[j], values[j], uses[j], defaults[j]);
+        }
+        return atts;
+    }
+
+
+    /**
+     *  Receives two arrays and returns their elements merged in a single array,
+     *  with the elements from the first array placed before the elements from
+     *  the second array.
+     *
+     *@since
+     */
+    public void testMergeArrays() {
+
+        String[] array01 = {"a", "b", "c", "d"};
+        String[] array02 = {"1", "2", "3"};
+        String[] expected01 = {"a", "b", "c", "d", "1", "2", "3"};
+
+        Element e1 = new Element("a");
+        Element e2 = new Element("b");
+        Element e3 = new Element("c");
+
+        Element[] array03 = {e1, e2};
+        Element[] array04 = {e3};
+        Element[] expected02 = {e1, e2, e3};
+        Element[] expected03 = {new Element("a"), new Element("b"), new Element("c")};
+
+        String[] result01 = (String[])loader.mergeArrays(array01, array02);
+        Element[] result02 = (Element[])loader.mergeArrays(array03, array04);
+
+        for (int i = 0; i < expected01.length; i++) {
+            assertEquals(result01[i], expected01[i]);
+        }
+        for (int i = 0; i < expected02.length; i++) {
+            assertEquals(result02[i], expected02[i]);
+            assertEquals(result02[i], expected03[i]);
+        }
+    }
+
+
+    /**
+     *  Returns an array of Attribute objects extracted from an &lt;!ATTLIST&gt;
+     *  string which contains only attribute information (no element name)
+     *
+     *@exception  ParseException  Description of Exception
+     *@since
+     */
+    public void testGetAttributes() throws ParseException {
+        String testString = "id ID #REQUIRED refid IDREF #IMPLIED dir CDATA #FIXED \"hello\" defaultexcludes %boo; " +
+                "#IMPLIED casesensitive (one | two | three) \"one\"\n includes CDATA #IMPLIED ";
+        Attribute[] testSet = {new Attribute("id", "ID", new String[0], "#REQUIRED", ""),
+                new Attribute("refid", "IDREF", new String[0], "#IMPLIED", ""),
+                new Attribute("dir", "CDATA", new String[0], "#FIXED", "hello"),
+                new Attribute("defaultexcludes", "LIST", new String[]{"true", "false"}, "#IMPLIED", ""),
+                new Attribute("casesensitive", "LIST", new String[]{"one", "two", "three"}, "", "one"),
+                new Attribute("includes", "CDATA", new String[0], "#IMPLIED", "")};
+
+        Attribute[] realSet = loader.getAttributes(testString);
+
+        assertEquals(testSet.length, realSet.length);
+        Arrays.sort(realSet);
+        Arrays.sort(testSet);
+        for (int i = 0; i < testSet.length; i++) {
+            assertEqualAttributes(testSet[i], realSet[i]);
+        }
+    }
+
+
+    /**
+     *  Receives a parameter entity: %string; Looks it up in the entityMap
+     *  Replaces it with the corresponding value
+     *
+     *@exception  ParseException  Description of Exception
+     *@since
+     */
+    public void testGetParameterEntityValue() throws ParseException {
+
+        String success01 = "%boo;";
+        String success02 = "%tasklist;";
+        String success03 = "%threedeep;";
+
+        String expected01 = "(true | false)";
+        String expected02 = "a|b | c |(true | false) | d|e ";
+        String expected03 = "start, a|b | c |(true | false) | d|e , end";
+
+        assertEquals(loader.getParameterEntityValue(success01), expected01);
+        assertEquals(loader.getParameterEntityValue(success02), expected02);
+        assertEquals(loader.getParameterEntityValue(success03), expected03);
+    }
+
+
+    /**
+     *  Test of getAttributeData method, of class argonavis.dtd.DTDLoader.
+     *
+     *@exception  ParseException  Description of Exception
+     *@since
+     */
+    public void testGetAttributeData() throws ParseException {
+
+        String[] attData = {"id ID             #IMPLIED",
+                "refid IDREF       #REQUIRED",
+                "dir CDATA         #FIXED \"hello\"",
+                "defaultexcludes   %boo; #IMPLIED",
+                "casesensitive     %boo; \"true\"",
+                "includes          CDATA #IMPLIED"};
+
+        Attribute[] testAttSet = new Attribute[6];
+        testAttSet[0] = new Attribute("id", "ID", new String[0], "#IMPLIED", "");
+        testAttSet[1] = new Attribute("refid", "IDREF", new String[0], "#REQUIRED", "");
+        testAttSet[2] = new Attribute("dir", "CDATA", new String[0], "#FIXED", "hello");
+        testAttSet[3] = new Attribute("defaultexcludes", "LIST", new String[]{"true", "false"}, "#IMPLIED", "");
+        testAttSet[4] = new Attribute("casesensitive", "LIST", new String[]{"true", "false"}, "", "true");
+        testAttSet[5] = new Attribute("includes", "CDATA", new String[0], "#IMPLIED", "");
+
+        for (int i = 0; i < testAttSet.length; i++) {
+            Attribute recvAtt = loader.getAttributeData(new StringTokenizer(attData[i]));
+            assertEqualAttributes(testAttSet[i], recvAtt);
+        }
+    }
+
+
+    /**
+     *  Checks if two attributes are equal
+     *
+     *@param  testAtt  Description of Parameter
+     *@param  recvAtt  Description of Parameter
+     *@since
+     */
+    public void assertEqualAttributes(Attribute testAtt, Attribute recvAtt) {
+        assertNotNull(recvAtt);
+        assertEquals(testAtt.getName(), recvAtt.getName());
+        assertEquals(testAtt.getType(), recvAtt.getType());
+        assertEquals(testAtt.getRule(), recvAtt.getRule());
+        assertEquals(testAtt.getDefaultValue(), recvAtt.getDefaultValue());
+        String[] testValues = testAtt.getValues();
+        String[] recvValues = recvAtt.getValues();
+        assertEquals(testValues.length, recvValues.length);
+        assertEqualLists(testValues, recvValues);
+        assertEquals(testAtt, recvAtt);
+    }
+
+
+    /**
+     *  Receives an ATTLIST enumeration which contains spaces and returns the
+     *  same enumeration without the spaces
+     *
+     *@since
+     */
+    public void testNormalizeEnum() {
+        // used by testNormalizeEnum
+        String attString01 = "(a";
+        StringTokenizer attToken01 = new StringTokenizer("| b | %boo; | c)");
+        String attString02 = "(";
+        StringTokenizer attToken02 = new StringTokenizer("a| b|c|def|g   | h      |i|j )");
+        String attString03 = "(";
+        StringTokenizer attToken03 = new StringTokenizer("a\t|\nb\n|c\t)");
+
+        // used by testGetEnumValues and testNormalizeEnum
+        String enum01 = "(a|b|%boo;|c)";
+        String enum02 = "(a|b|c|def|g|h|i|j)";
+        String enum03 = "(a|b|c)";
+
+        assertEquals(loader.normalizeEnum(attString01, attToken01), enum01);
+        assertEquals(loader.normalizeEnum(attString02, attToken02), enum02);
+        assertEquals(loader.normalizeEnum(attString03, attToken03), enum03);
+    }
+
+
+    /**
+     *  Receives a spaceless enumeration string and returns an array that
+     *  contains the individual items.
+     *
+     *@since
+     */
+    public void testGetEnumValues() {
+        // used by testGetEnumValues and testNormalizeEnum
+        String enum01 = "(a|b|%boo;|c)";
+        String enum02 = "(a|b|c|def|g|h|i|j)";
+
+        String[] enumArray01 = {"a", "b", "%boo;", "c"};
+        String[] enumArray02 = {"a", "b", "c", "def", "g", "h", "i", "j"};
+
+        String[] testArray01 = loader.getEnumValues(enum01);
+        String[] testArray02 = loader.getEnumValues(enum02);
+
+        for (int i = 0; i < enumArray01.length; i++) {
+            assertEquals(testArray01[i], enumArray01[i]);
+        }
+        for (int i = 0; i < enumArray02.length; i++) {
+            assertEquals(testArray02[i], enumArray02[i]);
+        }
+    }
+
+}
+

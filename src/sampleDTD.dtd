@@ -1,0 +1,49 @@
+<!-- Image Sample DTD -->
+
+<!NOTATION gif SYSTEM "image/gif" >
+<!NOTATION jpg SYSTEM "image/jpg" >
+<!NOTATION png SYSTEM "image/png" >
+
+<!-- Comments may contain <!ELEMENT> or other markup -->
+
+<!ENTITY % icon "NOTATION (gif | jpg | png)">         <!-- Parameter Entity -->
+<!ENTITY icon SYSTEM "/images/logo32.gif" NDATA gif>   <!-- Unparsed External General Entity -->
+<!ENTITY % data "title, author, description" >
+<!ENTITY copyright '<p>&copy; 2002 Unlimited "U" &amp; &apos;I&apos; Inc.'> <!-- General Entity -->
+<!ENTITY % subdata SYSTEM "subdata.dtd">              <!-- External Parameter Entity -->
+<!ENTITY home SYSTEM "index.html">                    <!-- External General Entity -->
+
+<!ELEMENT image (%data;, (file | link)+)>
+<!ATTLIST image id ID #IMPLIED
+                src CDATA #REQUIRED
+                type %icon; "png">
+                
+<?xml-stylesheet This is a place-holder. Test < and > and " and ' ?>
+                
+<!ELEMENT title (#PCDATA)>
+<!ELEMENT description (#PCDATA)>
+<!ELEMENT author (firstname, lastname)>
+<!ATTLIST author id ID #IMPLIED>
+<!ATTLIST author member CDATA #FIXED "true">
+
+<!ELEMENT firstname (#PCDATA)>
+<!ELEMENT lastname (#PCDATA)>
+
+<!-- Include external DTD subset here -->
+%subdata; <!-- Defines the one.flag and other.flag entities and the root element photo which contains image -->
+
+<!ELEMENT file EMPTY>
+<!ATTLIST file href CDATA #REQUIRED>
+<!ELEMENT link (#PCDATA | a)*>
+<!ELEMENT a (#PCDATA)>
+<!ATTLIST a href CDATA #REQUIRED
+            name NMTOKEN #IMPLIED>
+
+<![%one.flag;[
+<!ELEMENT temporary ANY>
+]]>
+
+<![%other.flag;[
+<!ELEMENT vanish ANY>
+]]>
+

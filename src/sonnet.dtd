@@ -1,0 +1,34 @@
+<!-- sonnet.dtd -->
+
+<!ELEMENT sonnet (author,title?,text) >
+<!ATTLIST sonnet
+          type (Shakespearean | Petrarchan) "Shakespearean">   
+
+<!ELEMENT text (line,line,line,line,
+                line,line,line,line,
+                line,line,line,line,
+                line,line) >
+
+<!ELEMENT author (last-name,first-name,
+                  year-of-birth?,year-of-death?) >
+
+<!ELEMENT title (#PCDATA)>
+<!ELEMENT last-name (#PCDATA)>
+<!ELEMENT first-name (#PCDATA)>
+<!ELEMENT year-of-birth (#PCDATA)>
+<!ELEMENT year-of-death (#PCDATA)>
+<!ELEMENT line (#PCDATA)>
+
+<!ENTITY black "noir">
+<!ENTITY % subdtd "<!ENTITY white 'blanc'>">
+%subdtd;
+
+<!ENTITY % apos '"'>
+<!ENTITY % quotest "<!ENTITY red %apos;rouge%apos;>">
+%quotest;
+
+<!ENTITY % loadtest SYSTEM "external.dtd">
+%loadtest;
+
+
+

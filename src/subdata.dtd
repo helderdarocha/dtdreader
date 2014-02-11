@@ -1,0 +1,20 @@
+<!ENTITY % one.flag "INCLUDE">              <!-- Parameter Entity -->
+<!ENTITY % other.flag "IGNORE">  
+
+<![%one.flag;[
+<!ENTITY % temp ", temporary">
+]]>
+
+<![%other.flag;[
+<!ENTITY % van ", vanish">
+]]>
+
+<!-- Commented tags should not be added.
+
+<!ELEMENT picture EMPTY>
+<!ATTLIST picture id ID #IMPLIED>
+
+-->
+
+<!ELEMENT photo ( image %temp; %van;)>
+<!ATTLIST photo id ID #IMPLIED>
